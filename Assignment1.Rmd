@@ -1,0 +1,101 @@
+---
+title: "Assignment1- Reproducible Research"
+author: "Aniruddha Amrite"
+date: "January 4, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r libraries}
+library(ggplot2)
+```
+
+The following code chunk sets the working directory and reads in the dataset 
+
+```{r}
+setwd("H:/Personal/Continuing Education/Data Scientist Specialization/Reproducible Research")
+data<-read.csv("activity.csv", stringsAsFactors = F)
+str(data)
+data$date<-as.POSIXct(data$date) #convert the date to a posixCT data format from character
+```
+
+## Total number of steps taken per day
+
+The following code calculates the total number of steps taken each day and plots a histogram and calculates the mean and
+median total steps per day
+```{r, stepsperday}
+stepsd<-with(data,aggregate(steps~date, FUN=sum))
+hist(stepsd$steps, main="Histogram of total steps taken per day", xlab="Steps", col="blue")
+meanTotalSteps<-with(stepsd,mean(steps, na.rm=T))
+medianTotalSteps<-with(stepsd,median(steps, na.rm=T))
+print(paste("Mean Total Steps per day =",meanTotalSteps, Sep=""))
+print(paste("Median Total Steps per day =",medianTotalSteps, Sep=""))
+```
+
+## Total steps per time interval
+```{r, interval}
+stepsi<-with(data,aggregate(steps~interval, FUN=mean))
+plot(stepsi$interval,stepsi$steps,type="l", main="Averge steps per day for 5-minute intervals throughout the day",
+     xlab="Time Interval (minutes)", ylab="Average steps per day")
+print (paste("The interval containing on avergae the maximum number of steps is",stepsi$interval[stepsi$steps==max(stepsi$steps)],sep=" "))
+```
+Thus on average the higest activity happens around 8:35 to 8:40 AM (assuming interval 0 is 00:00 midnight to 00:05)
+
+## Imputing Missing Values
+
+The missing values for the steps in the dataset will be replaced by the mean missing value for that interval across
+all days. The code chunk below replaces the NA values with the mean for that time interval across all days.
+```{r, missing}
+TotalMissingValues<-sum(!complete.cases(data))
+print(paste("The total number of NAs in the dataset is ", TotalMissingValues, sep=" "))
+
+dataNA<-subset(data, is.na(data$steps))# asubset for all the NA values
+dataNA<-merge(stepsi,dataNA, by="interval")#merge with the mean values across interval dataset created in previous chunk
+dataNA$steps.y<-NULL #delete this column
+datanotNA<-subset(data, !is.na(data$steps)) # subset without the NA values
+colnames(dataNA)[colnames(dataNA)=="steps.x"]<-"steps" # rename the column to "steps"
+dataNA<-dataNA[c("steps","date","interval")]# reorder the columns so that both the subsets have same order
+data1<-rbind(datanotNA,dataNA)# combine the subsets to get the dataset
+data1<-data1[order(data1$date,data1$interval),] # sort the dataset in the correct order. 
+```
+
+## Total number of steps taken per day after imputation of NA values
+
+The following code calculates the total number of steps taken each day and plots a histogram and calculates the mean and
+median total steps per day
+```{r, stepsperday1}
+stepsd1<-with(data1,aggregate(steps~date, FUN=sum))
+hist(stepsd1$steps, main="Histogram of total steps taken per day", xlab="Steps", col="blue")
+meanTotalSteps1<-with(stepsd1,mean(steps, na.rm=T))
+medianTotalSteps1<-with(stepsd1,median(steps, na.rm=T))
+print(paste("Mean Total Steps per day =",meanTotalSteps1, Sep=""))
+print(paste("Median Total Steps per day =",medianTotalSteps1, Sep=""))
+```
+
+The impact of substituting the NA values with mean of the interval data is just to change the frequency of occurence in the histogram. The mean and the median values for the total steps per day do not change significantly after imputation.
+
+## Are there activity differences between the weekdays and weekends
+```{r, weekday}
+data1$weekday<-weekdays(data1$date)
+data1$day<-ifelse(data1$weekday %in% c("Saturday", "Sunday"), "Weekend","Weekday")
+stepsi1<-with(data1,aggregate(steps~interval+day, FUN=mean))
+
+ggplot(data=stepsi1, aes(x=interval, y=steps), group=1)+
+    geom_point()+   
+  geom_line(aes(group=1))+
+       facet_grid(.~day)+
+  theme_bw()+
+  theme(
+    plot.background = element_blank()
+    ,panel.grid.major = element_blank()
+    ,panel.grid.minor = element_blank()
+    ,axis.line.x = element_line(color="black", size = 1)
+    ,axis.title.x= element_text(face="bold",size=16)
+    ,axis.title.y= element_text(face="bold",size=16))+
+  xlab("Time Interval during a Day (Min)")+
+  ylab("Average Steps Taken")
+
+```
+During the weekday the average steps taken are more in the early part of the day as compared to throughout the day whereas during the weekend they appear to be evenly spread out throughout the day
